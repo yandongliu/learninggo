@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
 )
 
 var DEBUG = true
+var logger = log.New(os.Stderr, "logger: ", log.Lshortfile)
 
 type Rating struct {
 	uid    int
@@ -65,7 +67,7 @@ func NMF_sgd(m *Matrix, numIters int) {
 
 	for iter := 0; iter < numIters; iter++ {
 		rmse := 0.0
-		for i, r := range m.ratings {
+		for _, r := range m.ratings {
 			p := m.P[r.uid]
 			q := m.Q[r.iid]
 			predict := innerproduct(p, q)
@@ -75,20 +77,14 @@ func NMF_sgd(m *Matrix, numIters int) {
 				q[j] += (gamma * (p[j]*diff - lambda*q[j]))
 				p[j] += (gamma * (q[j]*diff - lambda*p[j]))
 			}
-			//fmt.Println(p, q, rmse)
-			if DEBUG && i%1000 == 0 {
-				//fmt.Println("processed ", i, " ratings.")
-			}
 		}
-		fmt.Println("rmse:", rmse)
+		logger.Println(fmt.Sprintf("rmse: %f", rmse))
 	}
-	fmt.Println(gamma, lambda)
 }
 
-func readMovieLensFile(fn string, splitter string, rank int) *Matrix {
-	if DEBUG {
-		fmt.Println("reading file:", fn)
-	}
+func readMovieLensFile(fn string, rank int) *Matrix {
+	logger.Println("reading file:" + fn)
+	splitter := "::"
 	fp, err := os.Open(fn)
 	check("Read file", err)
 	defer fp.Close()
@@ -127,9 +123,7 @@ func readMovieLensFile(fn string, splitter string, rank int) *Matrix {
 	}
 	m.numUsers = numUser
 	m.numItems = numItem
-	if DEBUG {
-		fmt.Printf("#rank %d, #users: %d, #items: %d\n", m.rank, numUser, numItem)
-	}
+	logger.Println(fmt.Sprintf("#rank %d, #users: %d, #items: %d\n", m.rank, numUser, numItem))
 	m.P = make([][]float64, numUser)
 	m.Q = make([][]float64, numItem)
 	for i := 0; i < numUser; i++ {
@@ -147,23 +141,11 @@ func readMovieLensFile(fn string, splitter string, rank int) *Matrix {
 	return &m
 }
 
-func test() {
-	p := []float64{0.1, 0.2}
-	q := []float64{0.2, 0.3}
-	r := innerproduct(p, q)
-	fmt.Println(r, r == 0.08)
-}
-
 func main() {
-	test()
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: fn splitter")
-		m := readMovieLensFile("../data/ml-1m/ratings.dat", "::", 10)
-		NMF_sgd(m, 50)
-		printArray(m.P[0])
-		printArray(m.P[1])
+		fmt.Println("Usage: data_file")
 	} else {
-		m := readMovieLensFile(os.Args[1], "::", 30)
-		NMF_sgd(m, 100)
+		m := readMovieLensFile(os.Args[1], 20)
+		NMF_sgd(m, 50)
 	}
 }
